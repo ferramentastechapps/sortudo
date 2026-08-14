@@ -1,0 +1,13 @@
+{
+  "name": "sortudo-analyzer",
+  "version": "1.0.0",
+  "description": "Análise Estatística de Loterias Brasileiras",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "author": "",
+  "license": "MIT"
+}
