@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sortudo Analyzer — Análise Estatística de Loterias Brasileiras</title>
+  <meta name="description" content="Sistema de análise estatística profunda das loterias brasileiras. Mega-Sena, Lotofácil, Quina e Dia de Sorte — frequência, atraso, padrões e sugestões inteligentes." />
+  <meta name="keywords" content="loterias, mega-sena, lotofácil, quina, dia de sorte, análise estatística, sugestões, números" />
+
+  <!-- Preconnect para Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════ -->
+  <header id="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🍀</span>
+        Sortudo Analyzer
+      </div>
+      <span class="header-badge">ANÁLISE ESTATÍSTICA</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HERO
+  ═══════════════════════════════════════════════════════ -->
+  <section id="hero">
+    <div class="hero-tag">
+      <span>⚡</span> Powered by Dados Históricos Reais
+    </div>
+    <h1 class="hero-title">
+      Análise Profunda das<br />
+      <span>Loterias Brasileiras</span>
+    </h1>
+    <p class="hero-subtitle">
+      6 algoritmos estatísticos analisam o histórico de concursos para gerar sugestões
+      inteligentes com frequência, atraso, padrões par/ímpar, soma e muito mais.
+    </p>
+    <div class="disclaimer-banner">
+      ⚠️ Loterias são aleatórias. Esta ferramenta é para análise e entretenimento. Jogue com responsabilidade.
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       LOTTERY TABS
+  ═══════════════════════════════════════════════════════ -->
+  <section id="lottery-tabs">
+    <div class="tabs-wrapper">
+      <button class="tab-btn active" data-lottery="megasena" id="tab-megasena">
+        <span class="tab-emoji">🟢</span>
+        Mega-Sena
+      </button>
+      <button class="tab-btn" data-lottery="lotofacil" id="tab-lotofacil">
+        <span class="tab-emoji">🟣</span>
+        Lotofácil
+      </button>
+      <button class="tab-btn" data-lottery="quina" id="tab-quina">
+        <span class="tab-emoji">🔵</span>
+        Quina
+      </button>
+      <button class="tab-btn" data-lottery="diadesorte" id="tab-diadesorte">
+        <span class="tab-emoji">🟠</span>
+        Dia de Sorte
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MAIN CONTENT (renderizado via JS)
+  ═══════════════════════════════════════════════════════ -->
+  <main id="main-content">
+    <!-- Conteúdo inserido dinamicamente pelo app.js -->
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-msg">Inicializando análise...</div>
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════════════ -->
+  <footer id="app-footer">
+    <div class="footer-inner">
+      <div class="footer-logo">🍀 Sortudo Analyzer</div>
+      <p class="footer-text">
+        Dados históricos baseados em concursos oficiais da Caixa Econômica Federal.<br />
+        Análise estatística para fins de entretenimento — não garantimos acertos.<br />
+        <strong style="color:#fca5a5">Jogue com responsabilidade. Se precisar de ajuda: CVV 188.</strong>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Módulos JS -->
+  <script type="module" src="app.js?v=99"></script>
+
+</body>
+</html>
