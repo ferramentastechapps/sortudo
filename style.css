@@ -914,3 +914,163 @@ body {
 .delay-table-wrapper::-webkit-scrollbar { height: 4px; }
 .delay-table-wrapper::-webkit-scrollbar-track { background: transparent; }
 .delay-table-wrapper::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 2px; }
+
+/* ─── TOP GRID (Fix #7) ──────────────────────────────────── */
+.top-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .top-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── DATA STATUS BAR (Fix #12 + #13) ───────────────────── */
+.data-status-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-bottom: 0;
+}
+.data-status-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.data-status-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.data-status-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.data-status-text strong { color: var(--text-primary); }
+.data-status-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.period-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.period-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-family: 'Inter', sans-serif;
+}
+.period-select:hover { border-color: var(--gold); }
+.period-select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-dim); }
+
+/* ─── HEATMAP INTENSITY LEGEND (Fix #10) ────────────────── */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+.heatmap-legend-bar {
+  flex: 1;
+  min-width: 80px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    rgba(20, 180, 40, 0.5),
+    rgba(140, 100, 40, 0.6),
+    rgba(240, 80, 40, 0.85)
+  );
+  border: 1px solid var(--border);
+}
+.heatmap-legend-label { white-space: nowrap; }
+.heatmap-legend-range {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+}
+
+/* ─── TOOLTIP TOUCH-FRIENDLY (Fix #6) ───────────────────── */
+.heatmap-cell.tooltip-active::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  z-index: 200;
+  pointer-events: none;
+  display: block !important;
+}
+
+/* ─── LOADING STEPS (Fix #8) ─────────────────────────────── */
+.loading-steps {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.loading-step {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  transition: var(--transition);
+}
+.loading-step.active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--gold-dim);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.loading-step.done {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--green-dim);
+  animation: none;
+}
+
+/* ─── CSS DE IMPRESSÃO (Fix #15) ────────────────────────── */
+@media print {
+  #app-header, #hero, #lottery-tabs, #app-footer,
+  .generate-btn, .copy-btn, .save-game-btn, .delete-game-btn,
+  #clear-all-saved-btn, #save-all-suggestions-btn,
+  .data-status-bar, .chart-container { display: none !important; }
+
+  body { background: white !important; color: black !important; }
+  .card {
+    border: 1px solid #ccc !important;
+    background: white !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .game-card { border: 1px solid #999 !important; background: #f9f9f9 !important; }
+  .ball { border: 1px solid #666 !important; color: black !important; background: #eee !important; }
+  .ball.hot { background: #ffcccc !important; border-color: #cc0000 !important; }
+  .ball.cold { background: #cce0ff !important; border-color: #0055cc !important; }
+  #main-content { padding: 0 !important; }
+}
+

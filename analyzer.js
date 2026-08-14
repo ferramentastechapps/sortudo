@@ -37,19 +37,30 @@ export function analyzeFrequency(results, lotteryKey) {
 // ────────────────────────────────────────────────────────────
 export function analyzeDelay(results, lotteryKey) {
   const cfg = LOTTERY_CONFIG[lotteryKey];
-  const lastSeen = {};
-  for (let n = cfg.min; n <= cfg.max; n++) lastSeen[n] = -1;
+  const lastSeenIdx = {};
+  for (let n = cfg.min; n <= cfg.max; n++) lastSeenIdx[n] = -1;
 
   for (let i = 0; i < results.length; i++) {
     for (const num of results[i].dezenas) {
-      if (lastSeen[num] === -1) lastSeen[num] = i;
+      if (lastSeenIdx[num] === -1) lastSeenIdx[num] = i;
     }
   }
 
+  // Usa diferença real de concursos quando possível, para ser preciso
+  // mesmo quando a API inseriu um concurso novo no início do array
+  const latestConcurso = results[0]?.concurso || 0;
   const maxDelay = results.length;
 
-  return Object.entries(lastSeen).map(([num, idx]) => {
-    const delay = idx === -1 ? maxDelay : idx;
+  return Object.entries(lastSeenIdx).map(([num, idx]) => {
+    let delay;
+    if (idx === -1) {
+      delay = maxDelay;
+    } else {
+      // Diferença real entre o último concurso e o concurso em que o número saiu
+      const concursoDoUltimoAcerto = results[idx].concurso;
+      delay = latestConcurso - concursoDoUltimoAcerto;
+    }
+
     const status = delay >= 20 ? 'urgent' : delay >= 10 ? 'late' : delay >= 5 ? 'normal' : 'recent';
     return {
       number: +num,
@@ -206,8 +217,8 @@ export function analyzeRepetition(results) {
 // quantos números quentes, normais, frios e repetidos
 // costumam sair juntos no mesmo concurso
 // ────────────────────────────────────────────────────────────
-export function analyzeComposition(results, lotteryKey) {
-  const freq = analyzeFrequency(results, lotteryKey);
+export function analyzeComposition(results, lotteryKey, freqData = null) {
+  const freq = freqData || analyzeFrequency(results, lotteryKey);
   const freqMap = {};
   for (const f of freq) freqMap[f.number] = f;
 

@@ -22,7 +22,7 @@ const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 // Cache em memória para evitar chamadas repetidas
 const cache = {};
 
-async function fetchWithTimeout(url, timeoutMs = 1200) {
+async function fetchWithTimeout(url, timeoutMs = 5000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

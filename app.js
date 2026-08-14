@@ -12,6 +12,42 @@ import {
 } from './analyzer.js';
 
 // ────────────────────────────────────────────────────────────
+// UTILITÁRIO: CLIPBOARD COM FALLBACK
+// ────────────────────────────────────────────────────────────
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback para HTTP ou navegadores mais antigos
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    return Promise.resolve();
+  } catch (e) {
+    return Promise.reject(e);
+  } finally {
+    ta.remove();
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// UTILITÁRIO: SANITIZAÇÃO BÁSICA PARA innerHTML
+// ────────────────────────────────────────────────────────────
+function sanitize(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ────────────────────────────────────────────────────────────
 // ESTADO GLOBAL
 // ────────────────────────────────────────────────────────────
 const State = {
@@ -19,7 +55,8 @@ const State = {
   results: {},
   loading: false,
   charts: {},
-  currentSuggestions: null
+  currentSuggestions: null,
+  analysisWindow: 0  // 0 = todos os concursos
 };
 
 // ────────────────────────────────────────────────────────────
@@ -53,8 +90,31 @@ function getPrizeBadge(lotteryKey, hits) {
 function getSavedGames(lotteryKey) {
   try {
     const raw = localStorage.getItem(`sortudo_saved_${lotteryKey}`);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Sanitiza e valida cada item
+    return parsed.filter(g =>
+      g &&
+      typeof g === 'object' &&
+      Array.isArray(g.numbers) &&
+      g.numbers.every(n => typeof n === 'number' && isFinite(n))
+    ).map(g => ({
+      id: String(g.id || ('g_' + Math.random().toString(36).substr(2, 9))),
+      lotteryKey: String(g.lotteryKey || lotteryKey),
+      concursoAlvo: Number(g.concursoAlvo) || 0,
+      strategyId: String(g.strategyId || 'unknown'),
+      strategyName: String(g.strategyName || 'Jogo Salvo'),
+      gameNum: Number(g.gameNum) || 1,
+      numbers: g.numbers.map(Number),
+      sum: Number(g.sum) || 0,
+      evens: Number(g.evens) || 0,
+      odds: Number(g.odds) || 0,
+      avgScore: Number(g.avgScore) || 0,
+      criadoEm: String(g.criadoEm || '-')
+    }));
   } catch (e) {
+    console.warn('[Storage] Dados corrompidos, limpando:', e);
     return [];
   }
 }
@@ -72,6 +132,7 @@ function saveGamesToStorage(lotteryKey, gamesList) {
 // ────────────────────────────────────────────────────────────
 function initApp() {
   setupTabs();
+  setupResizeListener();
   loadLottery('megasena');
 }
 
@@ -94,14 +155,29 @@ function setupTabs() {
   });
 }
 
+// Fix #22 — Resize listener debounced para corrigir grids
+function setupResizeListener() {
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const topGrid = document.getElementById('top-grid');
+      if (!topGrid) return;
+      topGrid.style.gridTemplateColumns = window.innerWidth < 768 ? '1fr' : '1fr 1.4fr';
+    }, 150);
+  });
+}
+
 // ────────────────────────────────────────────────────────────
 // CARREGAMENTO DE DADOS
 // ────────────────────────────────────────────────────────────
 async function loadLottery(key) {
   if (State.loading) return;
   State.loading = true;
+  State.analysisWindow = 0; // reseta filtro de período ao trocar de loteria
 
-  showLoadingState();
+  const cfg = LOTTERY_CONFIG[key];
+  showLoadingState(cfg?.name || key);
 
   try {
     const results = await getResults(key, (msg) => updateLoadingMessage(msg));
@@ -118,22 +194,29 @@ async function loadLottery(key) {
 // ────────────────────────────────────────────────────────────
 // RENDERIZAÇÃO PRINCIPAL
 // ────────────────────────────────────────────────────────────
+function getFilteredResults(results) {
+  if (!State.analysisWindow || State.analysisWindow === 0) return results;
+  return results.slice(0, State.analysisWindow);
+}
+
 function renderAll(key, results) {
   const cfg = LOTTERY_CONFIG[key];
+  const filtered = getFilteredResults(results);
 
-  // Análises
-  const freq       = analyzeFrequency(results, key);
-  const delay      = analyzeDelay(results, key);
-  const evenOdd    = analyzeEvenOdd(results, key);
-  const sumAna     = analyzeSum(results);
-  const quadrants  = analyzeQuadrants(results, key);
-  const repetition = analyzeRepetition(results);
-  const composition = analyzeComposition(results, key);
-  const scores     = computeLotoScores(results, key);
+  // Fix #19-20: Calcula freq UMA VEZ e reutiliza nas funções que precisam
+  const freq       = analyzeFrequency(filtered, key);
+  const delay      = analyzeDelay(filtered, key);
+  const evenOdd    = analyzeEvenOdd(filtered, key);
+  const sumAna     = analyzeSum(filtered);
+  const quadrants  = analyzeQuadrants(filtered, key);
+  const repetition = analyzeRepetition(filtered);
+  const composition = analyzeComposition(filtered, key, freq);  // passa freq reutilizado
+  const scores     = computeLotoScores(filtered, key);
 
   // Render sections
-  renderStats(key, results, freq, sumAna, repetition);
-  renderLastResults(results.slice(0, 5), scores, key);
+  renderDataStatus(key, results, filtered);
+  renderStats(key, filtered, freq, sumAna, repetition);
+  renderLastResults(results.slice(0, 5), scores, key);  // sempre últimos 5 reais
   renderHeatmap(freq, delay, scores, key);
   renderFrequencyChart(freq, key);
   renderDelayTable(delay.slice(0, 20));
@@ -149,9 +232,53 @@ function renderAll(key, results) {
     <div style="text-align:center; padding:3rem; color:var(--text-secondary);">
       <div style="font-size:3rem; margin-bottom:1rem;">🎯</div>
       <div style="font-family:'Outfit',sans-serif; font-size:1.1rem; font-weight:600; margin-bottom:6px;">Pronto para gerar sugestões!</div>
-      <div style="font-size:0.85rem;">Clique no botão acima para gerar 9 jogos com análise estatística</div>
+      <div style="font-size:0.85rem;">Clique no botão acima para gerar 12 jogos com análise estatística completa</div>
     </div>
   `;
+}
+
+// Fix #12 + #13 — Painel de status de dados e filtro de período
+function renderDataStatus(key, allResults, filteredResults) {
+  const el = document.getElementById('data-status-bar');
+  if (!el) return;
+
+  const latest = allResults[0];
+  const isApi = latest?.source === 'api';
+  const total = allResults.length;
+  const usingAll = !State.analysisWindow || State.analysisWindow === 0;
+
+  const options = [
+    { val: 0,   label: `Todos (${total})` },
+    { val: 100,  label: 'Últimos 100' },
+    { val: 300,  label: 'Últimos 300' },
+    { val: 500,  label: 'Últimos 500' },
+  ].filter(o => o.val === 0 || o.val < total);
+
+  el.innerHTML = `
+    <div class="data-status-inner">
+      <div class="data-status-left">
+        <span class="source-tag ${isApi ? 'api' : 'local'}">
+          ${isApi ? '● API ao vivo' : '● Dados locais'}
+        </span>
+        <span class="data-status-text">
+          Analisando <strong>${sanitize(String(filteredResults.length))}</strong> concursos
+          ${usingAll ? '(base completa)' : `de ${sanitize(String(total))} disponíveis`}
+          · Último: <strong>#${sanitize(String(latest?.concurso || '?'))}</strong>
+        </span>
+      </div>
+      <div class="data-status-right">
+        <label class="period-label">📅 Período:</label>
+        <select id="analysis-window-select" class="period-select">
+          ${options.map(o => `<option value="${o.val}" ${State.analysisWindow === o.val ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('analysis-window-select')?.addEventListener('change', (e) => {
+    State.analysisWindow = +e.target.value;
+    renderAll(key, allResults);
+  });
 }
 
 // ────────────────────────────────────────────────────────────
@@ -310,7 +437,6 @@ function renderHeatmap(freq, delay, scores, key) {
   const range = maxC - minC || 1;
 
   // Determine grid columns based on lottery
-  const total = cfg.max - cfg.min + 1;
   const cols = cfg.max <= 25 ? 5 : cfg.max <= 31 ? 8 : cfg.max <= 60 ? 10 : 10;
   container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
@@ -334,9 +460,45 @@ function renderHeatmap(freq, delay, scores, key) {
     el.style.borderColor = f.isHot ? '#ef4444' : f.isCold ? '#3b82f6' : 'transparent';
     el.style.color = intensity > 0.7 ? 'white' : '#cbd5e1';
     el.innerHTML = `<span class="cell-delay">⏱${d.delay}</span>${String(n).padStart(2,'0')}`;
+
+    // Fix #6: Tooltip touch-friendly para mobile
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showTouchTooltip(el);
+    });
+
     container.appendChild(el);
   }
+
+  // Fix #10: Legenda de intensidade do heatmap
+  const legendContainer = document.getElementById('heatmap-intensity-legend');
+  if (legendContainer) {
+    legendContainer.innerHTML = `
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-label">Menos frequente</span>
+        <div class="heatmap-legend-bar"></div>
+        <span class="heatmap-legend-label">Mais frequente</span>
+        <span class="heatmap-legend-range">(${minC}× – ${maxC}×)</span>
+      </div>
+    `;
+  }
 }
+
+// Fix #6: Tooltip touch — mostra/esconde via clique
+let activeTooltipEl = null;
+function showTouchTooltip(el) {
+  if (activeTooltipEl && activeTooltipEl !== el) {
+    activeTooltipEl.classList.remove('tooltip-active');
+  }
+  el.classList.toggle('tooltip-active');
+  activeTooltipEl = el.classList.contains('tooltip-active') ? el : null;
+}
+document.addEventListener('click', () => {
+  if (activeTooltipEl) {
+    activeTooltipEl.classList.remove('tooltip-active');
+    activeTooltipEl = null;
+  }
+});
 
 // ────────────────────────────────────────────────────────────
 // FREQUENCY CHART
@@ -595,7 +757,7 @@ async function handleGenerateClick() {
   }
 }
 
-document.getElementById('generate-btn')?.addEventListener('click', handleGenerateClick);
+// Fix #1: Listener do generate-btn está SOMENTE em rebuildMainContent() para evitar duplicação
 
 function renderSuggestions(suggestions, key) {
   State.currentSuggestions = suggestions;
@@ -634,17 +796,20 @@ function renderSuggestions(suggestions, key) {
     </div>
   `;
 
-  // Bind copy buttons
+  // Bind copy buttons — Fix #11: fallback de clipboard
   container.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const nums = btn.dataset.numbers;
-      navigator.clipboard.writeText(nums).then(() => {
+      copyToClipboard(nums).then(() => {
         btn.classList.add('copied');
         btn.textContent = '✅ Copiado!';
         setTimeout(() => {
           btn.classList.remove('copied');
-          btn.textContent = '📋 Copiar Números';
+          btn.textContent = '📋 Copiar';
         }, 2000);
+      }).catch(() => {
+        btn.textContent = '⚠️ Erro ao copiar';
+        setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
       });
     });
   });
@@ -790,11 +955,17 @@ function spawnConfetti() {
 // ────────────────────────────────────────────────────────────
 // LOADING STATE
 // ────────────────────────────────────────────────────────────
-function showLoadingState() {
+function showLoadingState(lotteryName) {
+  const name = lotteryName || 'Loteria';
   document.getElementById('main-content').innerHTML = `
     <div class="loading-state">
       <div class="spinner"></div>
-      <div class="loading-text" id="loading-msg">Carregando dados...</div>
+      <div class="loading-text" id="loading-msg">Carregando ${name}...</div>
+      <div class="loading-steps" id="loading-steps">
+        <div class="loading-step active" id="step-api">🌐 Buscando API</div>
+        <div class="loading-step" id="step-analyze">📊 Analisando</div>
+        <div class="loading-step" id="step-render">🎨 Renderizando</div>
+      </div>
     </div>
   `;
   // Recreate main-content structure
@@ -804,11 +975,23 @@ function showLoadingState() {
 function updateLoadingMessage(msg) {
   const el = document.getElementById('loading-msg');
   if (el) el.textContent = msg;
+  // Atualiza step visual
+  if (msg.includes('API') || msg.includes('Caixa')) {
+    document.getElementById('step-api')?.classList.add('done');
+    document.getElementById('step-analyze')?.classList.add('active');
+  } else if (msg.includes('local') || msg.includes('base')) {
+    document.getElementById('step-api')?.classList.add('done');
+    document.getElementById('step-analyze')?.classList.add('done');
+    document.getElementById('step-render')?.classList.add('active');
+  }
 }
 
 function rebuildMainContent() {
   const mc = document.getElementById('main-content');
   mc.innerHTML = `
+    <!-- BARRA DE STATUS DE DADOS (Fix #12 + #13) -->
+    <div id="data-status-bar" class="data-status-bar"></div>
+
     <!-- STATS -->
     <div class="card">
       <div class="card-header">
@@ -821,7 +1004,7 @@ function rebuildMainContent() {
     </div>
 
     <!-- ÚLTIMOS RESULTADOS + HEATMAP -->
-    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:1rem" id="top-grid">
+    <div class="top-grid" id="top-grid">
       <div class="card">
         <div class="card-header">
           <span class="card-icon">🏆</span>
@@ -844,6 +1027,8 @@ function rebuildMainContent() {
           <div class="legend-item"><div class="legend-dot" style="background:#4b5563"></div> Normal</div>
         </div>
         <div class="heatmap-grid" id="heatmap-grid"></div>
+        <!-- Fix #10: Legenda de intensidade -->
+        <div id="heatmap-intensity-legend"></div>
       </div>
     </div>
 
@@ -875,6 +1060,7 @@ function rebuildMainContent() {
               </tr>
             </thead>
             <tbody id="delay-table-body"></tbody>
+
           </table>
         </div>
       </div>

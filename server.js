@@ -30,10 +30,17 @@ const server = http.createServer((req, res) => {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('404 Not Found');
     } else {
+      // Fix #24: Cache inteligente — HTML sempre fresco, assets com 1h de cache
+      const isHtml = ext === '.html' || ext === '';
+      const cacheControl = isHtml
+        ? 'no-store, no-cache, must-revalidate'
+        : 'public, max-age=3600, stale-while-revalidate=86400';
+
       res.writeHead(200, {
         'Content-Type': contentType,
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Access-Control-Allow-Origin': '*'
+        'Cache-Control': cacheControl,
+        'Access-Control-Allow-Origin': '*',
+        'X-Content-Type-Options': 'nosniff'
       });
       res.end(content);
     }
