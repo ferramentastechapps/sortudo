@@ -1495,42 +1495,41 @@ function renderFechamento(key, results) {
   const nGames = m >= k ? comb(m, k) : 0;
   const cost   = (nGames * aposta).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
   const ready  = m >= lim.min && m <= lim.max;
-  const cols   = cfg.max <= 25 ? 5 : cfg.max <= 31 ? 8 : 10;
 
   container.innerHTML = `
-    <div style="margin-bottom:1rem;font-size:0.84rem;color:var(--text-secondary);line-height:1.6">
-      Selecione <strong style="color:var(--text-primary)">${lim.min}–${lim.max} dezenas</strong> e o sistema
-      gerará todos os jogos de ${k} dezenas (desdobramento completo), garantindo acerto mínimo
-      se as dezenas sorteadas estiverem no seu grupo.
+    <!-- Cabeçalho + controles numa linha -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:0.8rem;color:var(--text-secondary)">
+        Selecione <strong style="color:var(--text-primary)">${lim.min}–${lim.max} dezenas</strong>
+        para desdobramento de ${k} dezenas
+      </span>
+      <button onclick="fechSuggest('${key}')" style="margin-left:auto;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold);padding:3px 10px;border-radius:20px;font-size:0.72rem;cursor:pointer">⭐ Auto</button>
+      <button onclick="fechClear('${key}')" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:3px 8px;border-radius:20px;font-size:0.72rem;cursor:pointer">✕</button>
     </div>
 
-    <!-- Grade de seleção numérica -->
-    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:5px;margin-bottom:1.2rem">
+    <!-- Grade compacta: bolas 30px fixas, flex-wrap -->
+    <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px">
       ${Array.from({ length: cfg.max - cfg.min + 1 }, (_, i) => i + cfg.min).map(n => {
         const sel = pool.has(n);
         return `<div onclick="fechToggle(${n},'${key}')"
-          style="aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;
-            font-family:'Outfit',sans-serif;font-weight:700;font-size:0.78rem;cursor:pointer;user-select:none;transition:all 0.12s;
+          style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+            font-family:'Outfit',sans-serif;font-weight:700;font-size:0.67rem;cursor:pointer;user-select:none;flex-shrink:0;transition:all 0.1s;
             ${sel
-              ? `background:${cfg.color};color:#fff;box-shadow:0 0 10px ${cfg.color}88;border:2px solid ${cfg.color};transform:scale(1.08)`
+              ? `background:${cfg.color};color:#fff;border:2px solid ${cfg.color}`
               : 'background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border)'
             }">${String(n).padStart(2,'0')}</div>`;
       }).join('')}
     </div>
 
-    <!-- Controles -->
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
-      <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem">
-        ${m} selecionado${m !== 1 ? 's' : ''}
-      </span>
+    <!-- Status numa linha só -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem">
+      <strong>${m}</strong> selecionado${m!==1?'s':''}
       ${m < lim.min
-        ? `<span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold);padding:3px 10px;border-radius:12px;font-size:0.75rem">Selecione mais ${lim.min - m}</span>`
+        ? `<span style="color:var(--gold)">· selecione mais ${lim.min-m}</span>`
         : m > lim.max
-          ? `<span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;padding:3px 10px;border-radius:12px;font-size:0.75rem">Máximo ${lim.max} dezenas</span>`
-          : `<span style="background:rgba(34,197,94,0.12);border:1px solid var(--green);color:#86efac;padding:3px 10px;border-radius:12px;font-size:0.75rem">✅ ${nGames} jogo${nGames!==1?'s':''} · R$ ${cost}</span>`
+          ? `<span style="color:#fca5a5">· máximo ${lim.max}</span>`
+          : `<span style="background:rgba(34,197,94,0.12);border:1px solid var(--green);color:#86efac;padding:2px 10px;border-radius:10px">✅ ${nGames} jogo${nGames!==1?'s':''} · R$ ${cost}</span>`
       }
-      <button onclick="fechClear('${key}')" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:4px 12px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer">🗑️ Limpar</button>
-      <button onclick="fechSuggest('${key}')" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold);padding:4px 12px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer">⭐ Auto-selecionar</button>
     </div>
 
     <!-- Garantia matemática -->
