@@ -19,8 +19,9 @@ const API_BASE = 'https://api.guidi.dev.br/loteria';
 // CORS proxy (para contornar CORS no browser)
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
-// Cache em memória para evitar chamadas repetidas
+// Cache em memória com TTL de 10 minutos
 const cache = {};
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 async function fetchWithTimeout(url, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -38,7 +39,8 @@ async function fetchWithTimeout(url, timeoutMs = 5000) {
 
 async function fetchLastResult(lotteryKey) {
   const cacheKey = `last_${lotteryKey}`;
-  if (cache[cacheKey]) return cache[cacheKey];
+  const cached = cache[cacheKey];
+  if (cached && (Date.now() - cached._cachedAt < CACHE_TTL_MS)) return cached;
 
   const apiName = API_NAMES[lotteryKey];
 
@@ -48,7 +50,7 @@ async function fetchLastResult(lotteryKey) {
     const data = await fetchWithTimeout(url);
     const result = normalizeApiResponse(data, lotteryKey);
     if (result) {
-      cache[cacheKey] = result;
+      cache[cacheKey] = { ...result, _cachedAt: Date.now() };
       return result;
     }
   } catch (e) {
@@ -61,7 +63,7 @@ async function fetchLastResult(lotteryKey) {
     const data = await fetchWithTimeout(proxied);
     const result = normalizeApiResponse(data, lotteryKey);
     if (result) {
-      cache[cacheKey] = result;
+      cache[cacheKey] = { ...result, _cachedAt: Date.now() };
       return result;
     }
   } catch (e) {
@@ -78,10 +80,16 @@ function normalizeApiResponse(data, lotteryKey) {
 
   // Suporte a diferentes formatos de resposta da API Guidi
   const dezenas = data.dezenas || data.listaDezenas || data.numbers || data.result;
-  const concurso = data.numero || data.concurso || data.id;
+
+  // data.numero pode ser null na API Guidi; testar explicitamente
+  const concurso = (data.numero != null ? data.numero : null)
+    ?? (data.concurso != null ? data.concurso : null)
+    ?? (data.id != null ? data.id : null);
+
   const dataStr = data.dataApuracao || data.data || data.date || '';
 
   if (!dezenas || !Array.isArray(dezenas) || dezenas.length === 0) return null;
+  if (concurso == null || isNaN(+concurso) || +concurso === 0) return null;
 
   return {
     concurso: +concurso,
