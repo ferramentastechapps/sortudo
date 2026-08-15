@@ -1691,3 +1691,9 @@ function fechSaveAll(key, targetConcurso) {
   }
 }
 
+// ── Expõe funções de onclick inline ao window (necessário em ES modules) ──
+window.fechToggle  = fechToggle;
+window.fechClear   = fechClear;
+window.fechSuggest = fechSuggest;
+window.fechGenerate = fechGenerate;
+window.fechSaveAll  = fechSaveAll;
