@@ -225,6 +225,7 @@ function renderAll(key, results) {
   renderQuadrants(quadrants, cfg);
   renderRepetition(repetition);
   renderComposition(composition, key);
+  renderFechamento(key, results);
   renderSavedGamesSection(key, results);
 
   // Reset suggestions
@@ -1111,6 +1112,16 @@ function rebuildMainContent() {
       <div id="composition-content"></div>
     </div>
 
+    <!-- FECHAMENTO MATEMÁTICO -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-icon">🔐</span>
+        <span class="card-title">Fechamento Matemático</span>
+        <span class="card-subtitle">Cobertura garantida com o menor número de jogos</span>
+      </div>
+      <div id="fechamento-content"></div>
+    </div>
+
     <!-- MEUS JOGOS SALVOS E CONFERÊNCIA DE DESEMPENHO -->
     <div class="card">
       <div class="card-header">
@@ -1417,3 +1428,266 @@ function renderSavedGameCard(g, key) {
     </div>
   `;
 }
+
+// ============================================================
+// FECHAMENTO MATEMÁTICO — Cobertura garantida
+// ============================================================
+const FState = { pool: {} };
+
+function getFPool(key) {
+  if (!FState.pool[key]) FState.pool[key] = new Set();
+  return FState.pool[key];
+}
+
+// Limites: [min dezenas no pool, max dezenas no pool]
+const FECH_LIMITS = {
+  megasena:   { min: 7,  max: 10 },
+  lotofacil:  { min: 16, max: 17 },
+  quina:      { min: 6,  max: 9  },
+  diadesorte: { min: 8,  max: 10 },
+};
+
+function comb(n, k) {
+  if (k > n || k < 0) return 0;
+  if (k === 0 || k === n) return 1;
+  let r = 1;
+  for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1);
+  return Math.round(r);
+}
+
+function generateAllCombinations(arr, k) {
+  const result = [];
+  function go(start, cur) {
+    if (cur.length === k) { result.push([...cur]); return; }
+    const rem = k - cur.length;
+    for (let i = start; i <= arr.length - rem; i++) {
+      cur.push(arr[i]); go(i + 1, cur); cur.pop();
+    }
+  }
+  go(0, []);
+  return result;
+}
+
+function getFechGuarantee(key, m) {
+  const k = LOTTERY_CONFIG[key].pick;
+  const out = [];
+  for (let d = k; d >= Math.max(k - 3, 1); d--) {
+    const p = getPrizeBadge(key, d);
+    out.push({
+      label:     p ? p.name : `${d} acertos`,
+      condition: `se ${d} das suas ${m} dezenas forem sorteadas`,
+      cls:       p?.cls || ''
+    });
+  }
+  return out;
+}
+
+function renderFechamento(key, results) {
+  const container = document.getElementById('fechamento-content');
+  if (!container) return;
+
+  const cfg    = LOTTERY_CONFIG[key];
+  const pool   = getFPool(key);
+  const lim    = FECH_LIMITS[key] || { min: cfg.pick + 1, max: cfg.pick + 4 };
+  const k      = cfg.pick;
+  const m      = pool.size;
+  const aposta = parseFloat(cfg.aposta.replace('R$ ', '').replace(',', '.'));
+  const nGames = m >= k ? comb(m, k) : 0;
+  const cost   = (nGames * aposta).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  const ready  = m >= lim.min && m <= lim.max;
+  const cols   = cfg.max <= 25 ? 5 : cfg.max <= 31 ? 8 : 10;
+
+  container.innerHTML = `
+    <div style="margin-bottom:1rem;font-size:0.84rem;color:var(--text-secondary);line-height:1.6">
+      Selecione <strong style="color:var(--text-primary)">${lim.min}–${lim.max} dezenas</strong> e o sistema
+      gerará todos os jogos de ${k} dezenas (desdobramento completo), garantindo acerto mínimo
+      se as dezenas sorteadas estiverem no seu grupo.
+    </div>
+
+    <!-- Grade de seleção numérica -->
+    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:5px;margin-bottom:1.2rem">
+      ${Array.from({ length: cfg.max - cfg.min + 1 }, (_, i) => i + cfg.min).map(n => {
+        const sel = pool.has(n);
+        return `<div onclick="fechToggle(${n},'${key}')"
+          style="aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;
+            font-family:'Outfit',sans-serif;font-weight:700;font-size:0.78rem;cursor:pointer;user-select:none;transition:all 0.12s;
+            ${sel
+              ? `background:${cfg.color};color:#fff;box-shadow:0 0 10px ${cfg.color}88;border:2px solid ${cfg.color};transform:scale(1.08)`
+              : 'background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border)'
+            }">${String(n).padStart(2,'0')}</div>`;
+      }).join('')}
+    </div>
+
+    <!-- Controles -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+      <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem">
+        ${m} selecionado${m !== 1 ? 's' : ''}
+      </span>
+      ${m < lim.min
+        ? `<span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold);padding:3px 10px;border-radius:12px;font-size:0.75rem">Selecione mais ${lim.min - m}</span>`
+        : m > lim.max
+          ? `<span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;padding:3px 10px;border-radius:12px;font-size:0.75rem">Máximo ${lim.max} dezenas</span>`
+          : `<span style="background:rgba(34,197,94,0.12);border:1px solid var(--green);color:#86efac;padding:3px 10px;border-radius:12px;font-size:0.75rem">✅ ${nGames} jogo${nGames!==1?'s':''} · R$ ${cost}</span>`
+      }
+      <button onclick="fechClear('${key}')" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:4px 12px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer">🗑️ Limpar</button>
+      <button onclick="fechSuggest('${key}')" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--gold);padding:4px 12px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer">⭐ Auto-selecionar</button>
+    </div>
+
+    <!-- Garantia matemática -->
+    ${ready ? `
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:1rem">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:8px">📐 Garantia Matemática do Desdobramento</div>
+        ${getFechGuarantee(key, m).map(g => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.79rem">
+            <span style="background:${g.cls==='gold'?'rgba(245,158,11,0.2)':'rgba(59,130,246,0.12)'};
+              border:1px solid ${g.cls==='gold'?'var(--gold)':'rgba(59,130,246,0.4)'};
+              color:${g.cls==='gold'?'var(--gold)':'#93c5fd'};
+              padding:2px 10px;border-radius:12px;font-weight:600;white-space:nowrap">${g.label}</span>
+            <span style="color:var(--text-secondary)">${g.condition}</span>
+          </div>
+        `).join('')}
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--text-dim);line-height:1.5">
+          ⚠️ A garantia vale apenas se os números sorteados estiverem <strong>dentro</strong> do seu grupo de ${m} dezenas.
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Botão gerar -->
+    <button id="fech-gen-btn" onclick="fechGenerate('${key}')" ${!ready ? 'disabled' : ''}
+      style="width:100%;padding:13px;border-radius:var(--radius-md);font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;
+        cursor:${ready ? 'pointer' : 'not-allowed'};transition:all 0.2s;
+        background:${ready ? `linear-gradient(135deg,${cfg.color}bb,${cfg.color})` : 'var(--bg-card)'};
+        border:1px solid ${ready ? cfg.color : 'var(--border)'};
+        color:${ready ? '#fff' : 'var(--text-dim)'}">
+      🔐 Gerar Fechamento${ready ? ` — ${nGames} jogo${nGames!==1?'s':''}` : ''}
+    </button>
+
+    <div id="fech-results" style="margin-top:1.5rem"></div>
+  `;
+}
+
+function fechToggle(n, key) {
+  const pool = getFPool(key);
+  const lim  = FECH_LIMITS[key];
+  if (pool.has(n)) pool.delete(n);
+  else if (pool.size < lim.max) pool.add(n);
+  renderFechamento(key, State.results[key]);
+}
+
+function fechClear(key) {
+  FState.pool[key] = new Set();
+  renderFechamento(key, State.results[key]);
+}
+
+function fechSuggest(key) {
+  const results = State.results[key];
+  if (!results) return;
+  const lim    = FECH_LIMITS[key];
+  const cfg    = LOTTERY_CONFIG[key];
+  const scores = computeLotoScores(results, key);
+  const nums   = Array.from({ length: cfg.max - cfg.min + 1 }, (_, i) => i + cfg.min)
+    .sort((a, b) => (scores[b]?.lotoScore || 50) - (scores[a]?.lotoScore || 50))
+    .slice(0, lim.min);
+  FState.pool[key] = new Set(nums);
+  renderFechamento(key, results);
+}
+
+function fechGenerate(key) {
+  const pool    = getFPool(key);
+  const cfg     = LOTTERY_CONFIG[key];
+  const results = State.results[key];
+  const poolArr = Array.from(pool).sort((a, b) => a - b);
+  const games   = generateAllCombinations(poolArr, cfg.pick);
+  const scores  = computeLotoScores(results, key);
+  const aposta  = parseFloat(cfg.aposta.replace('R$ ', '').replace(',', '.'));
+  const nextC   = (results[0]?.concurso || 0) + 1;
+
+  const container = document.getElementById('fech-results');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:1.2rem">
+        <div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.15rem;color:var(--text-primary)">
+            ✅ ${games.length} jogos gerados
+          </div>
+          <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px">
+            Custo total: <strong style="color:var(--gold)">R$ ${(games.length * aposta).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong>
+            &nbsp;·&nbsp; ${games.length} × ${cfg.aposta} · Alvo: Concurso #${nextC}
+          </div>
+        </div>
+        <button onclick="fechSaveAll('${key}', ${nextC})"
+          style="background:rgba(34,197,94,0.15);border:1px solid var(--green);color:#86efac;padding:7px 16px;border-radius:var(--radius-sm);font-size:0.82rem;cursor:pointer;font-weight:600">
+          💾 Salvar todos os jogos
+        </button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:8px">
+        ${games.map((game, idx) => {
+          const sum   = game.reduce((a, b) => a + b, 0);
+          const evens = game.filter(n => n % 2 === 0).length;
+          return `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px">
+              <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:6px;font-weight:600">Jogo ${idx + 1}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px">
+                ${game.map(n => {
+                  const s = scores[n];
+                  return `<div style="width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                    font-family:'Outfit',sans-serif;font-weight:700;font-size:0.7rem;
+                    background:${s?.isHot?'rgba(239,68,68,0.2)':s?.isCold?'rgba(59,130,246,0.2)':'var(--bg)'};
+                    border:1px solid ${s?.isHot?'#ef4444':s?.isCold?'#3b82f6':'var(--border)'};
+                    color:${s?.isHot?'#fca5a5':s?.isCold?'#93c5fd':'var(--text-secondary)'}">
+                    ${String(n).padStart(2,'00')}
+                  </div>`;
+                }).join('')}
+              </div>
+              <div style="font-size:0.7rem;color:var(--text-secondary);margin-top:6px">Σ ${sum} · ${evens}P/${game.length-evens}I</div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function fechSaveAll(key, targetConcurso) {
+  const pool    = getFPool(key);
+  const cfg     = LOTTERY_CONFIG[key];
+  const poolArr = Array.from(pool).sort((a, b) => a - b);
+  const games   = generateAllCombinations(poolArr, cfg.pick);
+  const saved   = getSavedGames(key);
+  let added     = 0;
+
+  games.forEach((game, idx) => {
+    if (saved.some(g => g.numbers.join(',') === game.join(',') && g.concursoAlvo === targetConcurso)) return;
+    saved.push({
+      id:           'fech_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
+      lotteryKey:   key,
+      concursoAlvo: targetConcurso,
+      strategyId:   'fechamento',
+      strategyName: 'Fechamento Matemático',
+      gameNum:      idx + 1,
+      numbers:      game,
+      sum:          game.reduce((a, b) => a + b, 0),
+      evens:        game.filter(n => n % 2 === 0).length,
+      odds:         game.filter(n => n % 2 !== 0).length,
+      avgScore:     0,
+      criadoEm:     new Date().toLocaleDateString('pt-BR')
+    });
+    added++;
+  });
+
+  if (added > 0) {
+    saveGamesToStorage(key, saved);
+    renderSavedGamesSection(key, State.results[key]);
+    document.getElementById('saved-games-content')?.closest('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const btn = document.querySelector('[onclick*="fechSaveAll"]');
+  if (btn) {
+    btn.textContent = `✅ ${added} jogos salvos!`;
+    btn.style.background = 'var(--green-dim)';
+    btn.style.borderColor = 'var(--green)';
+  }
+}
+
