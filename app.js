@@ -1181,25 +1181,15 @@ function renderSavedGamesSection(key, results) {
     return;
   }
 
-  // Mapa rápido de concursos por número
-  const drawMap = {};
-  for (const r of results) drawMap[r.concurso] = r;
-
-  // Conferir cada jogo
+  // Conferir cada jogo contra o concurso-alvo E TODOS os posteriores
   const checkedGames = savedList.map(g => {
-    const draw = drawMap[g.concursoAlvo];
-    if (draw) {
-      const drawSet = new Set(draw.dezenas);
-      const hitsNumbers = g.numbers.filter(n => drawSet.has(n));
-      const hits = hitsNumbers.length;
-      const prize = getPrizeBadge(key, hits);
-      return { ...g, checked: true, draw, hits, hitsNumbers, prize };
-    } else {
-      return { ...g, checked: false };
-    }
+    const multiChecks = checkGameAcrossDraws(g, results, key);
+    const bestResult  = getBestResult(multiChecks);
+    const hasAnyPrize = multiChecks.some(c => c.prize);
+    return { ...g, multiChecks, bestResult, hasAnyPrize };
   });
 
-  // Estatísticas por estratégia
+  // Estatísticas por estratégia (baseado no melhor resultado de cada jogo)
   const stratStats = {};
   checkedGames.forEach(g => {
     const sId = g.strategyName || g.strategyId;
@@ -1207,24 +1197,33 @@ function renderSavedGamesSection(key, results) {
       stratStats[sId] = { name: sId, total: 0, checked: 0, totalHits: 0, prizes: 0, maxHits: 0 };
     }
     stratStats[sId].total++;
-    if (g.checked) {
+    if (g.bestResult) {
       stratStats[sId].checked++;
-      stratStats[sId].totalHits += g.hits;
-      if (g.hits > stratStats[sId].maxHits) stratStats[sId].maxHits = g.hits;
-      if (g.prize) stratStats[sId].prizes++;
+      stratStats[sId].totalHits += g.bestResult.hits;
+      if (g.bestResult.hits > stratStats[sId].maxHits) stratStats[sId].maxHits = g.bestResult.hits;
+      if (g.bestResult.prize) stratStats[sId].prizes++;
     }
   });
 
   const stratRanking = Object.values(stratStats)
-    .map(s => ({
-      ...s,
-      avgHits: s.checked > 0 ? (s.totalHits / s.checked).toFixed(2) : '0.00'
-    }))
+    .map(s => ({ ...s, avgHits: s.checked > 0 ? (s.totalHits / s.checked).toFixed(2) : '0.00' }))
     .sort((a, b) => parseFloat(b.avgHits) - parseFloat(a.avgHits));
 
   const bestStrat = stratRanking.find(s => s.checked > 0);
+  const anyPrize  = checkedGames.some(g => g.hasAnyPrize);
 
   container.innerHTML = `
+    <!-- Banner de premiação global -->
+    ${anyPrize ? `
+      <div style="background:linear-gradient(135deg,rgba(245,158,11,0.25),rgba(234,179,8,0.12));border:1px solid var(--gold);border-radius:var(--radius-md);padding:16px 20px;margin-bottom:1.5rem;display:flex;align-items:center;gap:14px">
+        <div style="font-size:2.2rem">🎉</div>
+        <div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.05rem;color:var(--gold)">Premiação encontrada nos seus jogos salvos!</div>
+          <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:3px">Um ou mais jogos acertaram dezenas suficientes para prêmio. Veja o destaque 🏆 em cada card abaixo.</div>
+        </div>
+      </div>
+    ` : ''}
+
     <!-- Top Estratégia Mais Assertiva -->
     ${bestStrat ? `
       <div style="background:var(--gold-dim);border:1px solid var(--gold);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -1235,7 +1234,7 @@ function renderSavedGamesSection(key, results) {
         <div style="display:flex;gap:1rem">
           <div style="text-align:right">
             <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1.3rem;color:var(--text-primary)">${bestStrat.avgHits} dezenas</div>
-            <div style="font-size:0.7rem;color:var(--text-secondary)">Média de acertos por jogo</div>
+            <div style="font-size:0.7rem;color:var(--text-secondary)">Melhor acerto médio</div>
           </div>
           ${bestStrat.prizes > 0 ? `
             <div style="text-align:right">
@@ -1250,22 +1249,19 @@ function renderSavedGamesSection(key, results) {
     <!-- Ranking de Estratégias -->
     ${stratRanking.length > 0 ? `
       <div style="margin-bottom:1.5rem">
-        <div style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Desempenho por Estratégia (Conferência Automática):</div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Desempenho por Estratégia (conferência em todos os concursos posteriores):</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px">
           ${stratRanking.map(s => `
             <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px">
               <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:0.9rem;color:var(--text-primary);margin-bottom:6px">${s.name}</div>
               <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-secondary)">
-                <span>Jogos conferidos:</span>
-                <strong style="color:var(--text-primary)">${s.checked}/${s.total}</strong>
+                <span>Jogos conferidos:</span><strong style="color:var(--text-primary)">${s.checked}/${s.total}</strong>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-secondary);margin-top:2px">
-                <span>Média de acertos:</span>
-                <strong style="color:var(--gold)">${s.avgHits} dezenas</strong>
+                <span>Melhor acerto (médio):</span><strong style="color:var(--gold)">${s.avgHits} dezenas</strong>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-secondary);margin-top:2px">
-                <span>Maior acerto:</span>
-                <strong style="color:var(--green)">${s.maxHits} acertos</strong>
+                <span>Maior acerto:</span><strong style="color:var(--green)">${s.maxHits} acertos</strong>
               </div>
             </div>
           `).join('')}
@@ -1280,51 +1276,10 @@ function renderSavedGamesSection(key, results) {
     </div>
 
     <div class="games-row">
-      ${checkedGames.map(g => {
-        const statusBadge = g.checked
-          ? `<span class="badge badge-normal">✅ Conc. #${g.concursoAlvo} Sorteado</span>`
-          : `<span class="badge badge-late">⏳ Conc. #${g.concursoAlvo} Aguardando</span>`;
-
-        const prizeTag = g.prize
-          ? `<span class="meta-chip ${g.prize.cls}">${g.prize.name}</span>`
-          : '';
-
-        return `
-          <div class="game-card" style="position:relative">
-            <div class="game-header">
-              <div>
-                <div class="game-label">${g.strategyName || 'Jogo Salvo'} #${g.gameNum || 1}</div>
-                <div style="font-size:0.7rem;color:var(--text-secondary)">Alvo: Conc. #${g.concursoAlvo} · Salvo em ${g.criadoEm}</div>
-              </div>
-              <div>${statusBadge}</div>
-            </div>
-
-            <!-- Bolas com destaque para os acertos -->
-            <div class="game-balls">
-              ${g.numbers.map(n => {
-                const isHit = g.checked && g.hitsNumbers?.includes(n);
-                const cls = isHit ? 'hot' : 'neutral';
-                return `<div class="ball ${cls} sm" style="${isHit ? 'box-shadow:0 0 12px #22c55e;border-color:#22c55e;background:linear-gradient(135deg,#15803d,#22c55e)' : ''}" data-tip="${isHit ? 'ACERTOU! ✓' : ''}">${String(n).padStart(2,'0')}</div>`;
-              }).join('')}
-            </div>
-
-            <div class="game-meta">
-              ${g.checked ? `<span class="meta-chip ${g.hits >= 4 ? 'gold' : ''}">🎯 ${g.hits} Acertos</span>` : '<span class="meta-chip">Aguardando sorteio</span>'}
-              ${prizeTag}
-              <span class="meta-chip">&#931; ${g.sum}</span>
-              <span class="meta-chip">${g.evens}P / ${g.odds}I</span>
-            </div>
-
-            <div style="display:flex;justify-content:flex-end;margin-top:8px">
-              <button class="delete-game-btn" data-id="${g.id}" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer;transition:var(--transition-fast)">🗑️ Excluir</button>
-            </div>
-          </div>
-        `;
-      }).join('')}
+      ${checkedGames.map(g => renderSavedGameCard(g, key)).join('')}
     </div>
   `;
 
-  // Bind clear all button
   document.getElementById('clear-all-saved-btn')?.addEventListener('click', () => {
     if (confirm('Tem certeza que deseja apagar todos os palpites salvos desta loteria?')) {
       saveGamesToStorage(key, []);
@@ -1332,7 +1287,6 @@ function renderSavedGamesSection(key, results) {
     }
   });
 
-  // Bind delete single button
   container.querySelectorAll('.delete-game-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const gId = btn.dataset.id;
@@ -1341,4 +1295,125 @@ function renderSavedGamesSection(key, results) {
       renderSavedGamesSection(key, results);
     });
   });
+
+  container.querySelectorAll('.toggle-history-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById(`history-panel-${btn.dataset.gid}`);
+      if (!panel) return;
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      btn.textContent = isOpen ? '📅 Ver histórico por concurso' : '🔼 Fechar histórico';
+    });
+  });
+}
+
+// ── Verifica o jogo contra todos os concursos >= concursoAlvo ──
+function checkGameAcrossDraws(game, results, key) {
+  return results
+    .filter(r => r.concurso >= game.concursoAlvo)
+    .sort((a, b) => a.concurso - b.concurso)
+    .map(draw => {
+      const drawSet = new Set(draw.dezenas);
+      const hitsNumbers = game.numbers.filter(n => drawSet.has(n));
+      const hits = hitsNumbers.length;
+      return { concurso: draw.concurso, data: draw.data, hits, hitsNumbers, prize: getPrizeBadge(key, hits) };
+    });
+}
+
+// ── Retorna o resultado com mais acertos ──
+function getBestResult(checks) {
+  if (!checks || checks.length === 0) return null;
+  return checks.reduce((best, c) => c.hits > (best?.hits ?? -1) ? c : best, null);
+}
+
+// ── Renderiza um card de jogo salvo com histórico multi-concurso ──
+function renderSavedGameCard(g, key) {
+  const safeid   = (g.id || '').replace(/[^a-z0-9_]/gi, '_');
+  const isPending = g.multiChecks.length === 0;
+  const best     = g.bestResult;
+
+  const statusBadge = isPending
+    ? `<span class="badge badge-late">⏳ Conc. #${g.concursoAlvo} Aguardando</span>`
+    : `<span class="badge badge-normal">✅ ${g.multiChecks.length} concurso(s) verificado(s)</span>`;
+
+  const bestPrizeTag = best?.prize
+    ? `<span class="meta-chip ${best.prize.cls}" style="font-weight:700">${best.prize.name}</span>` : '';
+
+  // Bolas com destaque no MELHOR resultado
+  const ballsHtml = g.numbers.map(n => {
+    const isHit = best && best.hitsNumbers?.includes(n);
+    return `<div class="ball ${isHit ? 'hot' : 'neutral'} sm"
+      style="${isHit ? 'box-shadow:0 0 12px #22c55e;border-color:#22c55e;background:linear-gradient(135deg,#15803d,#22c55e)' : ''}"
+      data-tip="${isHit ? '✓ Acertou' : ''}">${String(n).padStart(2,'0')}</div>`;
+  }).join('');
+
+  // Linha do tempo por concurso
+  const timelineHtml = g.multiChecks.map((c, idx) => {
+    const isTarget = c.concurso === g.concursoAlvo;
+    const prizeTag = c.prize
+      ? `<span style="margin-left:6px;background:${c.prize.cls==='gold'?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.15)'};border:1px solid ${c.prize.cls==='gold'?'var(--gold)':'var(--green)'};color:${c.prize.cls==='gold'?'var(--gold)':'#86efac'};padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700">${c.prize.name}</span>`
+      : '';
+    const barW   = Math.round((c.hits / g.numbers.length) * 100);
+    const barClr = c.prize ? (c.prize.cls==='gold' ? 'var(--gold)' : 'var(--green)') : 'var(--blue)';
+    return `
+      <div style="display:flex;align-items:center;padding:7px 10px;border-radius:8px;margin-bottom:4px;
+        background:${isTarget?'rgba(245,158,11,0.08)':idx%2===0?'rgba(255,255,255,0.02)':'transparent'};
+        border:1px solid ${c.prize?'rgba(34,197,94,0.3)':isTarget?'rgba(245,158,11,0.3)':'transparent'}">
+        <div style="width:6px;height:6px;border-radius:50%;background:${c.prize?(c.prize.cls==='gold'?'var(--gold)':'var(--green)'):'var(--text-dim)'};margin-right:8px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <span style="font-family:'Outfit',sans-serif;font-size:0.8rem;font-weight:700;color:${isTarget?'var(--gold)':'var(--text-primary)'}">
+            #${c.concurso}${isTarget?' <span style="font-size:0.68rem;opacity:0.7">(alvo)</span>':''}
+          </span>
+          <span style="font-size:0.72rem;color:var(--text-secondary);margin-left:6px">${c.data}</span>
+          <span style="display:inline-block;width:${barW}%;min-width:4px;height:5px;background:${barClr};border-radius:3px;vertical-align:middle;margin-left:8px"></span>
+          ${prizeTag}
+        </div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:0.85rem;color:${c.prize?(c.prize.cls==='gold'?'var(--gold)':'var(--green)'):'var(--text-secondary)'};margin-left:8px;white-space:nowrap">
+          ${c.hits} acerto${c.hits!==1?'s':''}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="game-card" style="position:relative${g.hasAnyPrize?';border-color:rgba(34,197,94,0.5)':''}">
+      <div class="game-header">
+        <div>
+          <div class="game-label">${g.strategyName || 'Jogo Salvo'} #${g.gameNum || 1}</div>
+          <div style="font-size:0.7rem;color:var(--text-secondary)">Alvo: Conc. #${g.concursoAlvo} · Salvo em ${g.criadoEm}</div>
+        </div>
+        <div>${statusBadge}</div>
+      </div>
+
+      <div class="game-balls">${ballsHtml}</div>
+
+      <div class="game-meta">
+        ${best
+          ? `<span class="meta-chip ${best.hits >= 4 ? 'gold' : ''}">🏆 Melhor: ${best.hits} acertos (Conc. #${best.concurso})</span>`
+          : '<span class="meta-chip">Aguardando sorteio</span>'}
+        ${bestPrizeTag}
+        <span class="meta-chip">&#931; ${g.sum}</span>
+        <span class="meta-chip">${g.evens}P / ${g.odds}I</span>
+      </div>
+
+      ${g.multiChecks.length > 0 ? `
+        <div style="margin-top:10px">
+          <button class="toggle-history-btn" data-gid="${safeid}"
+            style="width:100%;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);color:#93c5fd;padding:6px 12px;border-radius:var(--radius-sm);font-size:0.78rem;cursor:pointer;transition:var(--transition-fast);text-align:center">
+            📅 Ver histórico por concurso
+          </button>
+          <div id="history-panel-${safeid}" style="display:none;margin-top:10px">
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em">Acertos por concurso:</div>
+            ${timelineHtml}
+          </div>
+        </div>
+      ` : ''}
+
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="delete-game-btn" data-id="${g.id}"
+          style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:4px 10px;border-radius:var(--radius-sm);font-size:0.75rem;cursor:pointer;transition:var(--transition-fast)">
+          🗑️ Excluir
+        </button>
+      </div>
+    </div>
+  `;
 }
