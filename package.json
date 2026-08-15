@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "ship":   "node ship.js",
     "update": "node update-results.js",
-    "start": "node server.js"
+    "start":  "node server.js"
   }
 }
