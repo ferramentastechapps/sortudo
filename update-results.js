@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ============================================================
 // update-results.js — Atualiza data.js com os resultados mais
-// recentes das loterias automaticamente.
+// recentes das loterias automaticamente com suporte a backfill.
 //
 // USO: node update-results.js
 // ============================================================
@@ -17,10 +17,10 @@ const DATA_FILE = path.join(__dirname, 'data.js');
 
 // Mapeamento dos nomes internos para cada API
 const LOTTERY_META = {
-  megasena:   { guidi: 'megasena',   caixa: 'megasena',   varName: 'MEGA_SENA_RESULTS' },
-  lotofacil:  { guidi: 'lotofacil',  caixa: 'lotofacil',  varName: 'LOTOFACIL_RESULTS' },
-  quina:      { guidi: 'quina',      caixa: 'quina',       varName: 'QUINA_RESULTS' },
-  diadesorte: { guidi: 'diadesorte', caixa: 'diadesorte', varName: 'DIA_DE_SORTE_RESULTS' },
+  megasena:   { guidi: 'megasena',   caixa: 'megasena',   loteriasCaixa: 'megasena',   varName: 'MEGA_SENA_RESULTS' },
+  lotofacil:  { guidi: 'lotofacil',  caixa: 'lotofacil',  loteriasCaixa: 'lotofacil',  varName: 'LOTOFACIL_RESULTS' },
+  quina:      { guidi: 'quina',      caixa: 'quina',       loteriasCaixa: 'quina',      varName: 'QUINA_RESULTS' },
+  diadesorte: { guidi: 'diadesorte', caixa: 'diadesorte', loteriasCaixa: 'diadesorte', varName: 'DIA_DE_SORTE_RESULTS' },
 };
 
 // ── Utilitários ───────────────────────────────────────────────
@@ -29,7 +29,7 @@ function fetchJson(url, timeoutMs = 8000) {
     const lib = url.startsWith('https') ? https : http;
     const req = lib.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (sortudo-updater/1.0)',
+        'User-Agent': 'Mozilla/5.0 (sortudo-updater/2.0)',
         'Accept': 'application/json',
       }
     }, (res) => {
@@ -54,7 +54,8 @@ function fetchJson(url, timeoutMs = 8000) {
 function normalizeResult(data, key) {
   if (!data) return null;
 
-  const dezenas = data.dezenas || data.listaDezenas || data.numbers || data.result;
+  const dezenas = data.dezenas || data.listaDezenas || data.numbers || data.result
+    || data.dezenasSorteadasOrdemSorteio || data.dezenasOrdemSorteio;
   const concurso = (data.numero != null ? data.numero : null)
     ?? (data.concurso != null ? data.concurso : null)
     ?? (data.id != null ? data.id : null);
@@ -64,10 +65,13 @@ function normalizeResult(data, key) {
   if (!dezenas || !Array.isArray(dezenas) || dezenas.length === 0) return null;
   if (concurso == null || isNaN(+concurso) || +concurso === 0) return null;
 
+  const parsedNumbers = dezenas.map(n => +n).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b);
+  if (parsedNumbers.length === 0) return null;
+
   const result = {
     concurso: +concurso,
     data: dataStr,
-    dezenas: dezenas.map(n => +n).filter(n => !isNaN(n)).sort((a, b) => a - b),
+    dezenas: parsedNumbers,
   };
 
   if (key === 'diadesorte' && mes) result.mes = mes;
@@ -80,25 +84,42 @@ async function fetchLatest(key) {
   const urls = [
     `https://api.guidi.dev.br/loteria/${meta.guidi}/ultimo`,
     `https://servicebus2.caixa.gov.br/portaldeloterias/api/${meta.caixa}/`,
+    `https://loteriascaixa-api.herokuapp.com/api/${meta.loteriasCaixa}/latest`
   ];
 
   for (const url of urls) {
     try {
-      console.log(`  -> Tentando: ${url}`);
       const data = await fetchJson(url);
       const result = normalizeResult(data, key);
-      if (result) {
-        console.log(`  OK Obtido da API: concurso #${result.concurso} (${result.data})`);
-        return result;
-      }
-    } catch (e) {
-      console.log(`  FALHOU: ${e.message}`);
+      if (result) return result;
+    } catch {
+      // continua próxima fonte
     }
   }
   return null;
 }
 
-// ── Leitura do data.js atual ──────────────────────────────────
+async function fetchSpecific(key, concursoNum) {
+  const meta = LOTTERY_META[key];
+  const urls = [
+    `https://api.guidi.dev.br/loteria/${meta.guidi}/${concursoNum}`,
+    `https://servicebus2.caixa.gov.br/portaldeloterias/api/${meta.caixa}/${concursoNum}`,
+    `https://loteriascaixa-api.herokuapp.com/api/${meta.loteriasCaixa}/${concursoNum}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const data = await fetchJson(url);
+      const result = normalizeResult(data, key);
+      if (result && result.concurso === +concursoNum) return result;
+    } catch {
+      // continua próxima fonte
+    }
+  }
+  return null;
+}
+
+// ── Leitura e manipulação do data.js atual ─────────────────────
 function getCurrentTopConcurso(content, varName) {
   const re = new RegExp(`const ${varName}\\s*=\\s*\\[\\s*\\{\\s*concurso:\\s*(\\d+)`);
   const m = content.match(re);
@@ -114,17 +135,17 @@ function buildEntryLine(key, result) {
   return `  { concurso: ${result.concurso}, data: "${result.data}", dezenas: [${d}] },`;
 }
 
-function insertIntoArray(content, varName, newLine) {
-  const re = new RegExp(`(const ${varName}\\s*=\\s*\\[)(\n)`);
+function insertIntoArray(content, varName, newLines) {
+  const re = new RegExp(`(const ${varName}\\s*=\\s*\\[)(\\r?\\n)`);
   if (!re.test(content)) {
     throw new Error(`Nao encontrou a variavel ${varName} no data.js`);
   }
-  return content.replace(re, `$1$2${newLine}\n`);
+  return content.replace(re, `$1$2${newLines}\n`);
 }
 
 // ── Main ──────────────────────────────────────────────────────
 async function main() {
-  console.log('\n=== Sortudo — Atualizador de Resultados ===\n');
+  console.log('\n=== Sortudo — Atualizador de Resultados com Backfill ===\n');
 
   let content = fs.readFileSync(DATA_FILE, 'utf8');
   let totalAdded = 0;
@@ -134,7 +155,7 @@ async function main() {
     const currentTop = getCurrentTopConcurso(content, meta.varName);
 
     console.log(`[${key.toUpperCase()}]`);
-    console.log(`  Ultimo local: #${currentTop}`);
+    console.log(`  Ultimo concurso local: #${currentTop}`);
 
     const latest = await fetchLatest(key);
 
@@ -148,20 +169,39 @@ async function main() {
       continue;
     }
 
+    const missingDraws = [latest];
     const diff = latest.concurso - currentTop;
+
     if (diff > 1) {
-      console.log(`  AVISO: pulou ${diff - 1} concurso(s) intermediario(s) — inserindo apenas o mais recente.`);
+      console.log(`  Identificados ${diff - 1} concurso(s) intermediario(s) pendentes. Buscando backfill...`);
+      for (let c = latest.concurso - 1; c > currentTop; c--) {
+        process.stdout.write(`    -> Buscando concurso #${c}... `);
+        const specific = await fetchSpecific(key, c);
+        if (specific) {
+          missingDraws.push(specific);
+          console.log(`OK (${specific.data})`);
+        } else {
+          console.log('FALHOU');
+        }
+      }
     }
 
-    const newLine = buildEntryLine(key, latest);
-    content = insertIntoArray(content, meta.varName, newLine);
-    totalAdded++;
-    console.log(`  ADICIONADO: concurso #${latest.concurso} (${latest.data}) — [${latest.dezenas.join(', ')}]\n`);
+    // Ordena do mais recente para o mais antigo
+    missingDraws.sort((a, b) => b.concurso - a.concurso);
+
+    const newLines = missingDraws.map(d => buildEntryLine(key, d)).join('\n');
+    content = insertIntoArray(content, meta.varName, newLines);
+    totalAdded += missingDraws.length;
+
+    for (const d of missingDraws) {
+      console.log(`  + ADICIONADO: #${d.concurso} (${d.data}) — [${d.dezenas.join(', ')}]`);
+    }
+    console.log('');
   }
 
   if (totalAdded > 0) {
     fs.writeFileSync(DATA_FILE, content, 'utf8');
-    console.log(`=== data.js atualizado com ${totalAdded} novo(s) resultado(s)! ===\n`);
+    console.log(`=== data.js atualizado com sucesso! (${totalAdded} novo(s) concurso(s)) ===\n`);
   } else {
     console.log('=== Nenhum resultado novo. data.js nao foi alterado. ===\n');
   }
@@ -171,3 +211,4 @@ main().catch(err => {
   console.error('\nErro fatal:', err.message);
   process.exit(1);
 });
+

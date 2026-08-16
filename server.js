@@ -17,8 +17,52 @@ const MIME = {
   '.ico':  'image/x-icon'
 };
 
-const server = http.createServer((req, res) => {
-  let reqPath = req.url.split('?')[0];
+import apiResultsHandler from './api/results.js';
+
+const server = http.createServer(async (req, res) => {
+  const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
+  let reqPath = parsedUrl.pathname;
+
+  // Rota serverless local para /api/results
+  if (reqPath === '/api/results') {
+    const query = Object.fromEntries(parsedUrl.searchParams.entries());
+    const reqMock = {
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      query
+    };
+    const resMock = {
+      statusCode: 200,
+      headers: {},
+      setHeader(name, val) {
+        this.headers[name] = val;
+        res.setHeader(name, val);
+      },
+      status(code) {
+        this.statusCode = code;
+        res.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.writeHead(this.statusCode);
+        res.end(JSON.stringify(data));
+      },
+      end(data) {
+        res.writeHead(this.statusCode);
+        res.end(data);
+      }
+    };
+    try {
+      await apiResultsHandler(reqMock, resMock);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   if (reqPath === '/') reqPath = '/index.html';
   const filePath = path.join(__dirname, reqPath);
 

@@ -4,7 +4,7 @@
 // ============================================================
 
 import { LOTTERY_CONFIG } from './data.js';
-import { getResults } from './api.js';
+import { getResults, forceRefreshResults, getLocalData } from './api.js';
 import {
   analyzeFrequency, analyzeDelay, analyzeEvenOdd,
   analyzeSum, analyzeQuadrants, analyzeRepetition,
@@ -48,12 +48,32 @@ function sanitize(str) {
 }
 
 // ────────────────────────────────────────────────────────────
+// UTILITÁRIO: TOAST NOTIFICATION
+// ────────────────────────────────────────────────────────────
+function showToast(message, icon = '🍀') {
+  let toast = document.getElementById('sortudo-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'sortudo-toast';
+    toast.className = 'sortudo-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span style="font-size:1.2rem">${icon}</span> <span>${sanitize(message)}</span>`;
+  toast.classList.add('show');
+  clearTimeout(window.__toastTimeout);
+  window.__toastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4000);
+}
+
+// ────────────────────────────────────────────────────────────
 // ESTADO GLOBAL
 // ────────────────────────────────────────────────────────────
 const State = {
   currentLottery: 'megasena',
   results: {},
   loading: false,
+  syncing: false,
   charts: {},
   currentSuggestions: null,
   analysisWindow: 0  // 0 = todos os concursos
@@ -128,11 +148,70 @@ function saveGamesToStorage(lotteryKey, gamesList) {
 }
 
 // ────────────────────────────────────────────────────────────
+// CONTROLE DE SINCRONIZAÇÃO E STATUS VISUAL
+// ────────────────────────────────────────────────────────────
+function setSyncingState(isSyncing, label = 'Buscando...') {
+  const pill = document.getElementById('live-status-pill');
+  const text = document.getElementById('live-status-text');
+  const btn = document.getElementById('btn-sync-results');
+  const icon = btn?.querySelector('.sync-icon');
+  const btnText = btn?.querySelector('.sync-text');
+
+  if (isSyncing) {
+    if (pill) pill.className = 'status-pill syncing';
+    if (text) text.textContent = label;
+    if (icon) icon.classList.add('spinning');
+    if (btnText) btnText.textContent = 'Atualizando...';
+    if (btn) btn.disabled = true;
+  } else {
+    if (pill) pill.className = 'status-pill online';
+    if (text) text.textContent = 'Ao vivo';
+    if (icon) icon.classList.remove('spinning');
+    if (btnText) btnText.textContent = 'Atualizar';
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function syncCurrentLottery(isManual = false) {
+  if (State.syncing || State.loading) return;
+  State.syncing = true;
+  const key = State.currentLottery;
+  const cfg = LOTTERY_CONFIG[key];
+  const prevTop = State.results[key]?.[0]?.concurso || 0;
+
+  setSyncingState(true, 'Verificando...');
+
+  try {
+    const results = await forceRefreshResults(key, (msg) => {
+      setSyncingState(true, msg);
+    });
+    State.results[key] = results;
+    renderAll(key, results);
+
+    const newTop = results[0]?.concurso || 0;
+    if (newTop > prevTop) {
+      showToast(`${cfg?.name || key}: Concurso #${newTop} atualizado!`, '🎉');
+      spawnConfetti();
+    } else if (isManual) {
+      showToast(`${cfg?.name || key}: Base já sincronizada no concurso #${newTop}.`, '✅');
+    }
+  } catch (e) {
+    console.warn('[SYNC] Erro ao sincronizar:', e);
+    if (isManual) showToast('Não foi possível atualizar das APIs no momento.', '⚠️');
+  } finally {
+    State.syncing = false;
+    setSyncingState(false);
+  }
+}
+
+// ────────────────────────────────────────────────────────────
 // INICIALIZAÇÃO
 // ────────────────────────────────────────────────────────────
 function initApp() {
   setupTabs();
   setupResizeListener();
+  setupSyncButton();
+  setupAutoSync();
   loadLottery('megasena');
 }
 
@@ -153,6 +232,36 @@ function setupTabs() {
       await loadLottery(key);
     });
   });
+}
+
+function setupSyncButton() {
+  const btn = document.getElementById('btn-sync-results');
+  if (btn) {
+    btn.addEventListener('click', () => syncCurrentLottery(true));
+  }
+}
+
+function setupAutoSync() {
+  let lastFocusSync = Date.now();
+  const handleFocusSync = () => {
+    // Só sincroniza automaticamente se passou pelo menos 60 segundos
+    if (Date.now() - lastFocusSync > 60000) {
+      lastFocusSync = Date.now();
+      syncCurrentLottery(false);
+    }
+  };
+
+  window.addEventListener('focus', handleFocusSync);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') handleFocusSync();
+  });
+
+  // Checagem periódica a cada 5 minutos
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      syncCurrentLottery(false);
+    }
+  }, 5 * 60 * 1000);
 }
 
 // Fix #22 — Resize listener debounced para corrigir grids
@@ -259,12 +368,12 @@ function renderDataStatus(key, allResults, filteredResults) {
     <div class="data-status-inner">
       <div class="data-status-left">
         <span class="source-tag ${isApi ? 'api' : 'local'}">
-          ${isApi ? '● API ao vivo' : '● Dados locais'}
+          ${isApi ? '● API ao vivo' : '● Base consolidada'}
         </span>
         <span class="data-status-text">
           Analisando <strong>${sanitize(String(filteredResults.length))}</strong> concursos
           ${usingAll ? '(base completa)' : `de ${sanitize(String(total))} disponíveis`}
-          · Último: <strong>#${sanitize(String(latest?.concurso || '?'))}</strong>
+          · Último: <strong>#${sanitize(String(latest?.concurso || '?'))}</strong> (${sanitize(String(latest?.data || '-'))})
         </span>
       </div>
       <div class="data-status-right">

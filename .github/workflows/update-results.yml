@@ -1,0 +1,45 @@
+name: Atualizar Resultados das Loterias
+
+on:
+  schedule:
+    # Executa diariamente nos horários dos sorteios (UTC -> Horário de Brasília UTC-3)
+    # 23:30 UTC = 20:30 BRT
+    # 00:00 UTC = 21:00 BRT
+    # 00:30 UTC = 21:30 BRT
+    # 01:00 UTC = 22:00 BRT
+    # 01:30 UTC = 22:30 BRT
+    # 02:00 UTC = 23:00 BRT
+    - cron: '30 23,0,1,2 * * 1-6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-lottery-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Executar atualizador de resultados
+        run: node update-results.js
+
+      - name: Commitar e fazer push se houver novos resultados
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain data.js)" ]; then
+            TODAY=$(date +'%d/%m/%Y')
+            git add data.js
+            git commit -m "chore(data): atualizar resultados das loterias ($TODAY) [skip ci]"
+            git push
+            echo "Resultados atualizados e commitados com sucesso!"
+          else
+            echo "Nenhum resultado novo encontrado. data.js mantido inalterado."
+          fi

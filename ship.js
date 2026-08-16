@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================
-// ship.js — Atualiza resultados + commit + push em um comando
+// ship.js — Atualiza resultados (com backfill) + commit + push
 //
 // USO: node ship.js
 //      npm run ship
@@ -18,10 +18,10 @@ const DATA_FILE = path.join(__dirname, 'data.js');
 
 // ── Configuração das loterias ─────────────────────────────────
 const LOTTERY_META = {
-  megasena:   { guidi: 'megasena',   caixa: 'megasena',   varName: 'MEGA_SENA_RESULTS' },
-  lotofacil:  { guidi: 'lotofacil',  caixa: 'lotofacil',  varName: 'LOTOFACIL_RESULTS' },
-  quina:      { guidi: 'quina',      caixa: 'quina',       varName: 'QUINA_RESULTS' },
-  diadesorte: { guidi: 'diadesorte', caixa: 'diadesorte', varName: 'DIA_DE_SORTE_RESULTS' },
+  megasena:   { guidi: 'megasena',   caixa: 'megasena',   loteriasCaixa: 'megasena',   varName: 'MEGA_SENA_RESULTS' },
+  lotofacil:  { guidi: 'lotofacil',  caixa: 'lotofacil',  loteriasCaixa: 'lotofacil',  varName: 'LOTOFACIL_RESULTS' },
+  quina:      { guidi: 'quina',      caixa: 'quina',       loteriasCaixa: 'quina',      varName: 'QUINA_RESULTS' },
+  diadesorte: { guidi: 'diadesorte', caixa: 'diadesorte', loteriasCaixa: 'diadesorte', varName: 'DIA_DE_SORTE_RESULTS' },
 };
 
 // ── HTTP helper ───────────────────────────────────────────────
@@ -30,7 +30,7 @@ function fetchJson(url, timeoutMs = 8000) {
     const lib = url.startsWith('https') ? https : http;
     const req = lib.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (sortudo-ship/1.0)',
+        'User-Agent': 'Mozilla/5.0 (sortudo-ship/2.0)',
         'Accept': 'application/json',
       }
     }, (res) => {
@@ -55,7 +55,8 @@ function fetchJson(url, timeoutMs = 8000) {
 // ── Normaliza resposta da API ─────────────────────────────────
 function normalizeResult(data, key) {
   if (!data) return null;
-  const dezenas = data.dezenas || data.listaDezenas || data.numbers || data.result;
+  const dezenas = data.dezenas || data.listaDezenas || data.numbers || data.result
+    || data.dezenasSorteadasOrdemSorteio || data.dezenasOrdemSorteio;
   const concurso = (data.numero != null ? data.numero : null)
     ?? (data.concurso != null ? data.concurso : null)
     ?? (data.id != null ? data.id : null);
@@ -65,10 +66,13 @@ function normalizeResult(data, key) {
   if (!dezenas || !Array.isArray(dezenas) || dezenas.length === 0) return null;
   if (concurso == null || isNaN(+concurso) || +concurso === 0) return null;
 
+  const parsedNumbers = dezenas.map(n => +n).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b);
+  if (parsedNumbers.length === 0) return null;
+
   const result = {
     concurso: +concurso,
     data: dataStr,
-    dezenas: dezenas.map(n => +n).filter(n => !isNaN(n)).sort((a, b) => a - b),
+    dezenas: parsedNumbers,
   };
   if (key === 'diadesorte' && mes) result.mes = mes;
   return result;
@@ -80,12 +84,30 @@ async function fetchLatest(key) {
   const urls = [
     `https://api.guidi.dev.br/loteria/${meta.guidi}/ultimo`,
     `https://servicebus2.caixa.gov.br/portaldeloterias/api/${meta.caixa}/`,
+    `https://loteriascaixa-api.herokuapp.com/api/${meta.loteriasCaixa}/latest`
   ];
   for (const url of urls) {
     try {
       const data = await fetchJson(url);
       const result = normalizeResult(data, key);
       if (result) return result;
+    } catch { /* tenta proxima */ }
+  }
+  return null;
+}
+
+async function fetchSpecific(key, concursoNum) {
+  const meta = LOTTERY_META[key];
+  const urls = [
+    `https://api.guidi.dev.br/loteria/${meta.guidi}/${concursoNum}`,
+    `https://servicebus2.caixa.gov.br/portaldeloterias/api/${meta.caixa}/${concursoNum}`,
+    `https://loteriascaixa-api.herokuapp.com/api/${meta.loteriasCaixa}/${concursoNum}`
+  ];
+  for (const url of urls) {
+    try {
+      const data = await fetchJson(url);
+      const result = normalizeResult(data, key);
+      if (result && result.concurso === +concursoNum) return result;
     } catch { /* tenta proxima */ }
   }
   return null;
@@ -105,10 +127,10 @@ function buildLine(key, r) {
   return `  { concurso: ${r.concurso}, data: "${r.data}", dezenas: [${d}] },`;
 }
 
-function insertLine(content, varName, line) {
+function insertLines(content, varName, lines) {
   return content.replace(
-    new RegExp(`(const ${varName}\\s*=\\s*\\[)(\n)`),
-    `$1$2${line}\n`
+    new RegExp(`(const ${varName}\\s*=\\s*\\[)(\\r?\\n)`),
+    `$1$2${lines}\n`
   );
 }
 
@@ -152,20 +174,33 @@ async function main() {
       continue;
     }
 
-    content = insertLine(content, meta.varName, buildLine(key, latest));
-    added.push(`  + ${key} #${latest.concurso} (${latest.data}) [${latest.dezenas.join(', ')}]`);
-    console.log(`NOVO! #${latest.concurso} (${latest.data})`);
+    const missingDraws = [latest];
+    const diff = latest.concurso - top;
+
+    if (diff > 1) {
+      for (let c = latest.concurso - 1; c > top; c--) {
+        const specific = await fetchSpecific(key, c);
+        if (specific) missingDraws.push(specific);
+      }
+    }
+
+    missingDraws.sort((a, b) => b.concurso - a.concurso);
+
+    const newLines = missingDraws.map(d => buildLine(key, d)).join('\n');
+    content = insertLines(content, meta.varName, newLines);
+
+    for (const d of missingDraws) {
+      added.push(`  + ${key} #${d.concurso} (${d.data}) [${d.dezenas.join(', ')}]`);
+    }
+    console.log(`NOVO! #${latest.concurso} (${latest.data}) ${missingDraws.length > 1 ? `(+${missingDraws.length - 1} backfill)` : ''}`);
   }
 
   if (added.length === 0) {
     console.log('\n  Nenhum resultado novo encontrado.');
-    console.log('  A API pode estar atrasada. Tente novamente mais tarde.\n');
-    console.log(`${LINE}\n`);
-    return;
+  } else {
+    fs.writeFileSync(DATA_FILE, content, 'utf8');
+    console.log(`\n  Adicionados ${added.length} resultado(s):\n${added.join('\n')}\n`);
   }
-
-  fs.writeFileSync(DATA_FILE, content, 'utf8');
-  console.log(`\n  Adicionados ${added.length} resultado(s):\n${added.join('\n')}\n`);
 
   // ── ETAPA 2: Git commit ────────────────────────────────────
   console.log('ETAPA 2/3  Commitando no Git...\n');
@@ -175,7 +210,7 @@ async function main() {
   } else {
     const today = new Date().toLocaleDateString('pt-BR');
     const names = added.map(l => l.match(/^\s+\+ (\w+)/)?.[1]).filter(Boolean).join(', ');
-    const msg = `resultados ${today} — ${names}`;
+    const msg = `resultados ${today} — ${names || 'sync'}`;
 
     git('add -A');
     const commitOut = git(`commit -m "${msg}"`);
@@ -205,3 +240,4 @@ main().catch(err => {
   console.error('\nErro:', err.message);
   process.exit(1);
 });
+
