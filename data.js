@@ -130,6 +130,7 @@ const MEGA_SENA_RESULTS = [
 
 // ─── LOTOFÁCIL ────────────────────────────────────────────────
 const LOTOFACIL_RESULTS = [
+  { concurso: 3770, data: "24/08/2026", dezenas: [1, 2, 4, 7, 8, 12, 13, 15, 16, 17, 18, 19, 23, 24, 25] },
   { concurso: 3769, data: "23/08/2026", dezenas: [1, 2, 3, 4, 5, 9, 10, 11, 15, 16, 17, 21, 23, 24, 25] },
   { concurso: 3768, data: "21/08/2026", dezenas: [2, 3, 4, 5, 6, 7, 10, 11, 12, 14, 15, 17, 20, 23, 24] },
   { concurso: 3767, data: "20/08/2026", dezenas: [2, 4, 6, 7, 9, 10, 11, 13, 14, 15, 16, 20, 21, 22, 23] },
@@ -203,6 +204,7 @@ const LOTOFACIL_RESULTS = [
 
 // ─── QUINA ───────────────────────────────────────────────────
 const QUINA_RESULTS = [
+  { concurso: 7100, data: "24/08/2026", dezenas: [27, 34, 36, 48, 76] },
   { concurso: 7099, data: "23/08/2026", dezenas: [27, 33, 35, 42, 59] },
   { concurso: 7098, data: "21/08/2026", dezenas: [4, 17, 21, 38, 47] },
   { concurso: 7097, data: "20/08/2026", dezenas: [14, 16, 65, 71, 76] },
@@ -275,6 +277,7 @@ const QUINA_RESULTS = [
 
 // ─── DIA DE SORTE ──────────────────────────────────────────────
 const DIA_DE_SORTE_RESULTS = [
+  { concurso: 1280, data: "24/08/2026", dezenas: [5, 10, 17, 22, 25, 28, 30], mes: "Fevereiro" },
   { concurso: 1279, data: "23/08/2026", dezenas: [1, 3, 4, 14, 15, 30, 31], mes: "Janeiro" },
   { concurso: 1278, data: "21/08/2026", dezenas: [1, 3, 4, 10, 12, 24, 30], mes: "Junho" },
   { concurso: 1277, data: "20/08/2026", dezenas: [1, 4, 8, 11, 16, 21, 29], mes: "Outubro" },
