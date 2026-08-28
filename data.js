@@ -61,6 +61,7 @@ const LOTTERY_CONFIG = {
 
 // ─── MEGA-SENA ────────────────────────────────────────────────
 const MEGA_SENA_RESULTS = [
+  { concurso: 3050, data: "27/08/2026", dezenas: [11, 14, 30, 38, 49, 55] },
   { concurso: 3049, data: "25/08/2026", dezenas: [6, 13, 36, 43, 53, 55] },
   { concurso: 3048, data: "23/08/2026", dezenas: [2, 6, 27, 39, 44, 50] },
   { concurso: 3047, data: "20/08/2026", dezenas: [4, 18, 22, 26, 31, 58] },
@@ -131,6 +132,8 @@ const MEGA_SENA_RESULTS = [
 
 // ─── LOTOFÁCIL ────────────────────────────────────────────────
 const LOTOFACIL_RESULTS = [
+  { concurso: 3773, data: "27/08/2026", dezenas: [3, 4, 7, 9, 11, 13, 14, 15, 17, 18, 20, 21, 22, 24, 25] },
+  { concurso: 3772, data: "26/08/2026", dezenas: [3, 5, 6, 7, 8, 9, 11, 12, 14, 15, 18, 20, 21, 23, 25] },
   { concurso: 3771, data: "25/08/2026", dezenas: [2, 3, 4, 5, 9, 10, 11, 12, 15, 16, 17, 18, 21, 23, 25] },
   { concurso: 3770, data: "24/08/2026", dezenas: [1, 2, 4, 7, 8, 12, 13, 15, 16, 17, 18, 19, 23, 24, 25] },
   { concurso: 3769, data: "23/08/2026", dezenas: [1, 2, 3, 4, 5, 9, 10, 11, 15, 16, 17, 21, 23, 24, 25] },
@@ -206,6 +209,8 @@ const LOTOFACIL_RESULTS = [
 
 // ─── QUINA ───────────────────────────────────────────────────
 const QUINA_RESULTS = [
+  { concurso: 7103, data: "27/08/2026", dezenas: [20, 25, 26, 59, 68] },
+  { concurso: 7102, data: "26/08/2026", dezenas: [11, 14, 38, 43, 77] },
   { concurso: 7101, data: "25/08/2026", dezenas: [32, 48, 52, 62, 68] },
   { concurso: 7100, data: "24/08/2026", dezenas: [27, 34, 36, 48, 76] },
   { concurso: 7099, data: "23/08/2026", dezenas: [27, 33, 35, 42, 59] },
@@ -280,6 +285,8 @@ const QUINA_RESULTS = [
 
 // ─── DIA DE SORTE ──────────────────────────────────────────────
 const DIA_DE_SORTE_RESULTS = [
+  { concurso: 1283, data: "27/08/2026", dezenas: [4, 8, 11, 19, 24, 27, 30], mes: "Maio" },
+  { concurso: 1282, data: "26/08/2026", dezenas: [7, 11, 15, 20, 22, 23, 29], mes: "Junho" },
   { concurso: 1281, data: "25/08/2026", dezenas: [1, 2, 18, 20, 21, 28, 31], mes: "Abril" },
   { concurso: 1280, data: "24/08/2026", dezenas: [5, 10, 17, 22, 25, 28, 30], mes: "Fevereiro" },
   { concurso: 1279, data: "23/08/2026", dezenas: [1, 3, 4, 14, 15, 30, 31], mes: "Janeiro" },
