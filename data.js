@@ -221,6 +221,7 @@ const LOTOFACIL_RESULTS = [
 
 // ─── QUINA ───────────────────────────────────────────────────
 const QUINA_RESULTS = [
+  { concurso: 7115, data: "11/09/2026", dezenas: [12, 43, 61, 67, 74] },
   { concurso: 7114, data: "10/09/2026", dezenas: [5, 21, 43, 51, 54] },
   { concurso: 7113, data: "09/09/2026", dezenas: [1, 32, 57, 78, 80] },
   { concurso: 7112, data: "08/09/2026", dezenas: [24, 27, 54, 61, 66] },
@@ -308,6 +309,7 @@ const QUINA_RESULTS = [
 
 // ─── DIA DE SORTE ──────────────────────────────────────────────
 const DIA_DE_SORTE_RESULTS = [
+  { concurso: 1295, data: "11/09/2026", dezenas: [10, 12, 14, 15, 24, 27, 31], mes: "Outubro" },
   { concurso: 1294, data: "10/09/2026", dezenas: [1, 2, 3, 6, 19, 29, 30], mes: "Fevereiro" },
   { concurso: 1293, data: "09/09/2026", dezenas: [6, 11, 12, 14, 22, 26, 28], mes: "Novembro" },
   { concurso: 1292, data: "08/09/2026", dezenas: [1, 6, 9, 11, 12, 22, 26], mes: "Maio" },
