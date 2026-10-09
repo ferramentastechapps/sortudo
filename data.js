@@ -149,6 +149,7 @@ const MEGA_SENA_RESULTS = [
 
 // ─── LOTOFÁCIL ────────────────────────────────────────────────
 const LOTOFACIL_RESULTS = [
+  { concurso: 3800, data: "08/10/2026", dezenas: [1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13, 14, 15, 19, 21] },
   { concurso: 3799, data: "07/10/2026", dezenas: [1, 3, 4, 5, 7, 8, 10, 12, 13, 18, 19, 20, 23, 24, 25] },
   { concurso: 3798, data: "06/10/2026", dezenas: [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 14, 18, 19, 20, 23] },
   { concurso: 3797, data: "05/10/2026", dezenas: [1, 2, 3, 6, 7, 8, 9, 10, 13, 14, 16, 18, 19, 20, 23] },
@@ -252,6 +253,7 @@ const LOTOFACIL_RESULTS = [
 
 // ─── QUINA ───────────────────────────────────────────────────
 const QUINA_RESULTS = [
+  { concurso: 7138, data: "08/10/2026", dezenas: [14, 16, 27, 34, 52] },
   { concurso: 7137, data: "07/10/2026", dezenas: [2, 7, 50, 61, 79] },
   { concurso: 7136, data: "06/10/2026", dezenas: [13, 14, 30, 53, 60] },
   { concurso: 7135, data: "05/10/2026", dezenas: [1, 6, 18, 43, 80] },
