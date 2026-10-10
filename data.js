@@ -61,6 +61,7 @@ const LOTTERY_CONFIG = {
 
 // ─── MEGA-SENA ────────────────────────────────────────────────
 const MEGA_SENA_RESULTS = [
+  { concurso: 3068, data: "08/10/2026", dezenas: [7, 10, 39, 40, 43, 57] },
   { concurso: 3067, data: "06/10/2026", dezenas: [1, 4, 17, 33, 41, 52] },
   { concurso: 3066, data: "03/10/2026", dezenas: [4, 6, 9, 13, 28, 48] },
   { concurso: 3065, data: "01/10/2026", dezenas: [8, 10, 30, 38, 50, 53] },
@@ -364,6 +365,7 @@ const QUINA_RESULTS = [
 
 // ─── DIA DE SORTE ──────────────────────────────────────────────
 const DIA_DE_SORTE_RESULTS = [
+  { concurso: 1318, data: "08/10/2026", dezenas: [1, 2, 3, 11, 20, 25, 27], mes: "Setembro" },
   { concurso: 1317, data: "07/10/2026", dezenas: [4, 7, 16, 25, 27, 28, 31], mes: "Março" },
   { concurso: 1316, data: "06/10/2026", dezenas: [1, 6, 10, 16, 18, 22, 29], mes: "Setembro" },
   { concurso: 1315, data: "05/10/2026", dezenas: [2, 9, 13, 15, 17, 19, 26], mes: "Outubro" },
