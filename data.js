@@ -61,6 +61,7 @@ const LOTTERY_CONFIG = {
 
 // ─── MEGA-SENA ────────────────────────────────────────────────
 const MEGA_SENA_RESULTS = [
+  { concurso: 3080, data: "01/11/2026", dezenas: [13, 17, 28, 29, 39, 58] },
   { concurso: 3079, data: "30/10/2026", dezenas: [5, 9, 16, 40, 41, 59] },
   { concurso: 3078, data: "29/10/2026", dezenas: [5, 7, 12, 29, 34, 36] },
   { concurso: 3077, data: "28/10/2026", dezenas: [2, 14, 18, 31, 35, 40] },
@@ -161,6 +162,7 @@ const MEGA_SENA_RESULTS = [
 
 // ─── LOTOFÁCIL ────────────────────────────────────────────────
 const LOTOFACIL_RESULTS = [
+  { concurso: 3819, data: "01/11/2026", dezenas: [1, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 22, 24, 25] },
   { concurso: 3818, data: "30/10/2026", dezenas: [2, 3, 4, 5, 6, 12, 14, 15, 16, 17, 19, 20, 22, 23, 24] },
   { concurso: 3817, data: "29/10/2026", dezenas: [2, 6, 8, 10, 11, 12, 13, 15, 16, 18, 19, 22, 23, 24, 25] },
   { concurso: 3816, data: "28/10/2026", dezenas: [1, 2, 3, 4, 6, 8, 13, 14, 16, 17, 18, 20, 22, 24, 25] },
@@ -283,6 +285,7 @@ const LOTOFACIL_RESULTS = [
 
 // ─── QUINA ───────────────────────────────────────────────────
 const QUINA_RESULTS = [
+  { concurso: 7157, data: "01/11/2026", dezenas: [9, 27, 58, 61, 78] },
   { concurso: 7156, data: "30/10/2026", dezenas: [12, 16, 59, 60, 71] },
   { concurso: 7155, data: "29/10/2026", dezenas: [14, 29, 33, 53, 72] },
   { concurso: 7154, data: "28/10/2026", dezenas: [6, 8, 41, 44, 45] },
@@ -412,6 +415,7 @@ const QUINA_RESULTS = [
 
 // ─── DIA DE SORTE ──────────────────────────────────────────────
 const DIA_DE_SORTE_RESULTS = [
+  { concurso: 1337, data: "01/11/2026", dezenas: [4, 6, 11, 19, 21, 23, 24], mes: "Novembro" },
   { concurso: 1336, data: "30/10/2026", dezenas: [3, 9, 17, 21, 23, 25, 27], mes: "Janeiro" },
   { concurso: 1335, data: "29/10/2026", dezenas: [1, 11, 15, 16, 18, 19, 24], mes: "Dezembro" },
   { concurso: 1334, data: "28/10/2026", dezenas: [2, 4, 6, 8, 9, 22, 25], mes: "Outubro" },
